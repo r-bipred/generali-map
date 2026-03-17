@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mappa Interattiva Onboarding</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            // height: 100vh;
+            background-color: #c2d8f0;
+            overflow: hidden;
+        }
+
+        #map-container {
+            position: relative;
+            width: 100%;
+            max-width: 1100px; 
+            max-height: 90vh;
+			min-height: 620px;
+            aspect-ratio: 16/9; 
+            // box-shadow: 0 20px 50px rgba(0,0,0,0.3);
+            background-color: #a2d9f5;
+            overflow: hidden;
+        }
+
+        /* --- 1. Sfondo Mare (Livello 1) --- */
+        @keyframes sea-move {
+            0% { transform: scale(1.1) translate(0, 0); }
+            50% { transform: scale(1.1) translate(-10px, -5px); }
+            100% { transform: scale(1.1) translate(0, 0); }
+        }
+
+        .layer-sea {
+            position: absolute;
+            top: -5%;
+            left: -5%;
+            width: 110%;
+            height: 110%;
+            background-image: url('mare.png'); 
+            background-size: cover;
+            background-position: center;
+            z-index: 1;
+            animation: sea-move 20s ease-in-out infinite alternate;
+        }
+
+        /* --- 2. Mappa base (mappa_2) --- */
+        .layer-map-2 {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            z-index: 2;
+            pointer-events: none;
+        }
+
+        /* --- 3. Barca (tra mappa_2 e mappa_3) --- */
+        #boat-container {
+            position: absolute;
+            width: 15%; /* aumentata al 15% */
+            z-index: 3; 
+            transition: top 1.5s ease-in-out, left 1.5s ease-in-out;
+            filter: drop-shadow(3px 3px 3px rgba(0,0,0,0.3));
+            pointer-events: none; 
+        }
+
+        #boat-orientation {
+            width: 100%;
+            height: 100%;
+            transition: transform 0.6s ease-in-out;
+            transform-origin: center center;
+        }
+
+        .boat-flipped {
+            transform: scaleX(-1);
+        }
+
+        @keyframes sailing-motion {
+            0% { transform: rotate(0deg) translateY(0); }
+            25% { transform: rotate(1deg) translateY(1px); }
+            50% { transform: rotate(0deg) translateY(2px); }
+            75% { transform: rotate(-1deg) translateY(1px); }
+            100% { transform: rotate(0deg) translateY(0); }
+        }
+
+        @keyframes sailing-fast {
+            0% { transform: rotate(0deg) translateY(0); }
+            25% { transform: rotate(3deg) translateY(-2px); }
+            50% { transform: rotate(0deg) translateY(0px); }
+            75% { transform: rotate(-2deg) translateY(-2px); }
+            100% { transform: rotate(0deg) translateY(0); }
+        }
+
+        #boat-img {
+            width: 100%;
+            display: block;
+            animation: sailing-motion 3s infinite ease-in-out;
+        }
+
+        .is-sailing #boat-img {
+            animation: sailing-fast 1s infinite linear;
+        }
+
+        /* --- 4. Mappa sopra (mappa_3, sopra la barca) --- */
+        .layer-map-3 {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            z-index: 4;
+            pointer-events: none;
+        }
+
+        /* --- 5. Pulsanti Cliccabili (sopra tutto) --- */
+        .click-zone {
+            position: absolute;
+            width: 14%;   
+            height: 10%;  
+            background-color: transparent; 
+            border: none;
+            z-index: 20; 
+            cursor: pointer;
+            border-radius: 8px;
+            transition: background-color 0.3s, box-shadow 0.3s;
+        }
+
+        .click-zone:hover {
+            background-color: rgba(255, 255, 255, 0.15);
+            box-shadow: 0 0 15px rgba(255, 255, 255, 0.4);
+        }
+
+        /* --- 6. Popup --- */
+        #popup {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0.9);
+            width: 320px; 
+            background: rgba(255, 255, 255, 0.98);
+            padding: 30px;
+            border-radius: 0; 
+            box-shadow: 0 20px 50px rgba(0,0,0,0.3);
+            z-index: 30; 
+            text-align: center;
+            display: none;
+            opacity: 0;
+            transition: opacity 0.3s ease, transform 0.3s ease;
+            border: 1px solid #ccc;
+        }
+
+        #popup.visible {
+            display: block;
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1);
+        }
+
+        #popup h2 { 
+            margin-top: 0; 
+            color: #aa1e13; 
+            text-transform: uppercase;
+            font-size: 20px;
+            letter-spacing: 1px;
+            margin-bottom: 15px;
+        }
+        
+        #popup p { 
+            font-size: 15px; 
+            color: #444; 
+            line-height: 1.6; 
+            margin-bottom: 20px;
+        }
+        
+        #close-btn {
+            background: #aa1e13; 
+            color: white;
+            border: none;
+            padding: 10px 25px;
+            border-radius: 0; 
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.2s;
+            text-transform: uppercase;
+            font-size: 12px;
+            letter-spacing: 1px;
+        }
+        #close-btn:hover { background: #8a180f; }
+
+    </style>
+</head>
+<body>
+
+    <div id="map-container">
+        <div class="layer-sea"></div>
+
+        <!-- mappa_2 sotto la barca -->
+        <img src="mappa_2.png" class="layer-map-2" alt="Mappa 2">
+
+        <!-- barca in mezzo -->
+        <div id="boat-container">
+            <div id="boat-orientation">
+                <img src="barca.png" id="boat-img" alt="Barca">
+            </div>
+        </div>
+
+        <!-- mappa_3 sopra la barca -->
+        <img src="mappa_3.png" class="layer-map-3" alt="Mappa 3">
+        
+        <div class="click-zone" style="top: 17%; left: 4%;" data-id="0" title="Embark"></div>
+        <div class="click-zone" style="top: 10%; left: 32%;" data-id="1" title="Navigate"></div>
+        <div class="click-zone" style="top: 30%; left: 68%;" data-id="2" title="Advance"></div>
+        <div class="click-zone" style="top: 79%; left: 22%;" data-id="3" title="Expand"></div>
+        <div class="click-zone" style="top: 58%; left: 50%;" data-id="4" title="Sail Forward"></div>
+
+        <div id="popup">
+            <h2 id="popup-title">Titolo</h2>
+            <p id="popup-desc">Descrizione...</p>
+            <button id="close-btn">Close</button>
+        </div>
+    </div>
+
+    <script>
+        const boatContainer = document.getElementById('boat-container');
+        const boatOrientation = document.getElementById('boat-orientation');
+        const popup = document.getElementById('popup');
+        const popupTitle = document.getElementById('popup-title');
+        const popupDesc = document.getElementById('popup-desc');
+        const closeBtn = document.getElementById('close-btn');
+        const zones = document.querySelectorAll('.click-zone');
+        
+        let currentPortIndex = 0; 
+        let isMoving = false;    
+
+        // DATI DEI PORTI
+        const portData = [
+            {
+                title: "EMBARK",
+                desc: "Step into GC&C, meet your team, and start getting familiar with your new environment."
+            },
+            {
+                title: "NAVIGATE",
+                desc: "Discover GC&C through the Newsroom and explore your tools and resources."
+            },
+            {
+                title: "ADVANCE",
+                desc: "Connect with your buddy and the HR team to review your progress."
+            },
+            {
+                title: "EXPAND",
+                desc: "Take advantage of our global network and engage with the Leadership Team."
+            },
+            {
+                title: "SAIL FORWARD",
+                desc: "Cruise towards the Next Level of your onboarding experience."
+            }
+        ];
+
+        // COORDINATE NAVI
+        const boatDestinations = [
+            { top: 29, left: 23 }, // Nave 1
+            { top: 20, left: 34 }, // Nave 2
+            { top: 43, left: 65 }, // Nave 3
+            { top: 57, left: 21 }, // Nave 4
+            { top: 50, left: 41 }  // Nave 5
+        ];
+
+        // Posizionamento iniziale della barca
+        function setInitialPosition(index) {
+            const loc = boatDestinations[index];
+            boatContainer.style.transition = 'none';
+            boatContainer.style.top = loc.top + '%';
+            boatContainer.style.left = loc.left + '%';
+            setTimeout(() => {
+                boatContainer.style.transition = 'top 1.5s ease-in-out, left 1.5s ease-in-out';
+            }, 50);
+        }
+        setInitialPosition(0);
+
+        zones.forEach((zone, index) => {
+            zone.addEventListener('click', () => {
+                if (isMoving) return; 
+                if (index === currentPortIndex) {
+                    openPopup(index);
+                } else {
+                    travelToPort(index);
+                }
+            });
+        });
+
+        async function travelToPort(targetIndex) {
+            isMoving = true;
+            closePopup(); 
+            boatContainer.classList.add('is-sailing');
+
+            while (currentPortIndex !== targetIndex) {
+                // Calcolo prossimo step
+                let nextIndex = (currentPortIndex < targetIndex) ? currentPortIndex + 1 : currentPortIndex - 1;
+                
+                // Gestione Flip
+                if (boatDestinations[nextIndex].left < boatDestinations[currentPortIndex].left) {
+                    boatOrientation.classList.add('boat-flipped');
+                } else {
+                    boatOrientation.classList.remove('boat-flipped');
+                }
+                
+                currentPortIndex = nextIndex;
+                await moveBoatStep(currentPortIndex);
+            }
+
+            boatContainer.classList.remove('is-sailing');
+            isMoving = false;
+            openPopup(targetIndex);
+        }
+
+        function moveBoatStep(index) {
+            return new Promise(resolve => {
+                const loc = boatDestinations[index];
+                boatContainer.style.top = loc.top + '%';
+                boatContainer.style.left = loc.left + '%';
+                setTimeout(() => { resolve(); }, 1500); 
+            });
+        }
+
+        function openPopup(index) {
+            popupTitle.textContent = portData[index].title;
+            popupDesc.textContent = portData[index].desc;
+            popup.classList.add('visible');
+        }
+
+        function closePopup() {
+            popup.classList.remove('visible');
+        }
+        closeBtn.addEventListener('click', closePopup);
+    </script>
+</body>
+</html>
